@@ -1,12 +1,24 @@
-const TelegramBot = require("node-telegram-bot-api");
-const OpenAI = require("openai");
+import TelegramBot from "node-telegram-bot-api";
+import { GoogleGenAI } from "@google/genai";
+import http from "http";
 
-const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, {
+const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
+const geminiKey = process.env.GEMINI_API_KEY;
+
+if (!telegramToken) {
+  throw new Error("TELEGRAM_BOT_TOKEN is missing");
+}
+
+if (!geminiKey) {
+  throw new Error("GEMINI_API_KEY is missing");
+}
+
+const bot = new TelegramBot(telegramToken, {
   polling: true
 });
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
+const ai = new GoogleGenAI({
+  apiKey: geminiKey
 });
 
 bot.on("message", async (msg) => {
@@ -18,26 +30,20 @@ bot.on("message", async (msg) => {
   try {
     await bot.sendChatAction(chatId, "typing");
 
-    const response = await openai.responses.create({
-      model: "gpt-5-mini",
-      input: [
-        {
-          role: "system",
-          content:
-            "أنت مساعد ذكي لخدمة الطلاب. أجب باختصار ووضوح وبأسلوب سعودي ودود. إذا كان السؤال غير واضح اطلب من الطالب توضيحه."
-        },
-        {
-          role: "user",
-          content: userMessage
-        }
-      ]
+    const result = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: userMessage,
+      config: {
+        systemInstruction:
+          "أنت مساعد ذكي لخدمة الطلاب. أجب باختصار ووضوح وبأسلوب سعودي ودود. لا تطيل في الرد."
+      }
     });
 
-    const reply = response.output_text;
+    const reply = result.text;
 
     await bot.sendMessage(chatId, reply);
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Gemini Error:", error);
 
     await bot.sendMessage(
       chatId,
@@ -45,5 +51,18 @@ bot.on("message", async (msg) => {
     );
   }
 });
+
+const PORT = process.env.PORT || 3000;
+
+http
+  .createServer((req, res) => {
+    res.writeHead(200, {
+      "Content-Type": "text/plain"
+    });
+    res.end("Telegram bot is running");
+  })
+  .listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on port ${PORT}`);
+  });
 
 console.log("Telegram bot is running...");
