@@ -1,13 +1,14 @@
 {
-  "name": "telegram-openai-bot",
+  "name": "telegram-gemini-bot",
   "version": "1.0.0",
-  "description": "Telegram bot connected to OpenAI",
+  "description": "Telegram bot with Gemini AI",
+  "type": "module",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "node-telegram-bot-api": "^0.66.0",
-    "openai": "^4.104.0"
+    "@google/genai": "^1.0.0",
+    "node-telegram-bot-api": "^0.66.0"
   }
 }
