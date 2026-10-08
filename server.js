@@ -2,51 +2,13 @@ import TelegramBot from "node-telegram-bot-api";
 import { GoogleGenAI } from "@google/genai";
 import http from "http";
 
-const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
-const geminiKey = process.env.GEMINI_API_KEY;
-
-if (!telegramToken) {
-  throw new Error("TELEGRAM_BOT_TOKEN is missing");
-}
-
-if (!geminiKey) {
-  throw new Error("GEMINI_API_KEY is missing");
-}
-
-const bot = new TelegramBot(telegramToken, {
+const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, {
   polling: true
 });
 
 const ai = new GoogleGenAI({
-  apiKey: geminiKey
+  apiKey: process.env.GEMINI_API_KEY
 });
-
-let modelName = null;
-
-async function getModel() {
-  try {
-    for await (const model of ai.models.list()) {
-      const name = model.name || "";
-
-      if (
-        model.supportedActions &&
-        model.supportedActions.includes("generateContent") &&
-        name.includes("gemini")
-      ) {
-        modelName = name.replace("models/", "");
-        console.log("Using Gemini model:", modelName);
-        return;
-      }
-    }
-
-    throw new Error("No Gemini model available");
-  } catch (error) {
-    console.error("Model Error:", error);
-    throw error;
-  }
-}
-
-await getModel();
 
 bot.on("message", async (msg) => {
   if (!msg.text) return;
@@ -57,7 +19,7 @@ bot.on("message", async (msg) => {
     await bot.sendChatAction(chatId, "typing");
 
     const response = await ai.models.generateContent({
-      model: modelName,
+      model: "gemini-3.8-flash",
       contents: msg.text,
       config: {
         systemInstruction:
@@ -68,7 +30,7 @@ bot.on("message", async (msg) => {
     const reply = response.text;
 
     if (!reply) {
-      throw new Error("Empty Gemini response");
+      throw new Error("Gemini returned an empty response");
     }
 
     await bot.sendMessage(chatId, reply);
@@ -84,15 +46,16 @@ bot.on("message", async (msg) => {
 
 const PORT = process.env.PORT || 3000;
 
-http
-  .createServer((req, res) => {
-    res.writeHead(200, {
-      "Content-Type": "text/plain"
-    });
-    res.end("Telegram bot is running");
-  })
-  .listen(PORT, "0.0.0.0", () => {
-    console.log("Server running on port " + PORT);
+const server = http.createServer((req, res) => {
+  res.writeHead(200, {
+    "Content-Type": "text/plain"
   });
+
+  res.end("Telegram bot is running");
+});
+
+server.listen(PORT, "0.0.0.0", () => {
+  console.log("Server running on port " + PORT);
+});
 
 console.log("Telegram bot is running...");
