@@ -10,6 +10,57 @@ const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY
 });
 
+const systemInstruction = `
+أنت مساعد ذكي لخدمة الطلاب.
+أجب باختصار ووضوح وبأسلوب سعودي ودود.
+لا تطيل في الرد.
+إذا كان السؤال غير واضح اطلب توضيحه باختصار.
+لا تكرر نفس الرد أو نفس الكلام.
+`;
+
+async function generateWithRetry(prompt) {
+  const maxRetries = 4;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await ai.models.generateContent({
+        model: "gemini-3.8-flash",
+        contents: prompt,
+        config: {
+          systemInstruction: systemInstruction
+        }
+      });
+
+      return response.text;
+    } catch (error) {
+      const status =
+        error?.status ||
+        error?.code ||
+        error?.error?.code;
+
+      const retryable =
+        status === 503 ||
+        status === "503" ||
+        status === 429 ||
+        status === "429" ||
+        status === 500 ||
+        status === "500";
+
+      if (!retryable || attempt === maxRetries) {
+        throw error;
+      }
+
+      const delay = Math.min(1000 * Math.pow(2, attempt), 8000);
+
+      console.log(
+        `Gemini temporary error ${status} - retry ${attempt + 1}/${maxRetries}`
+      );
+
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+}
+
 bot.on("message", async (msg) => {
   if (!msg.text) return;
 
@@ -18,44 +69,29 @@ bot.on("message", async (msg) => {
   try {
     await bot.sendChatAction(chatId, "typing");
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
-      contents: msg.text,
-      config: {
-        systemInstruction:
-          "أنت مساعد ذكي لخدمة الطلاب. أجب باختصار ووضوح وبأسلوب سعودي ودود. لا تطيل في الرد."
-      }
-    });
+    const answer = await generateWithRetry(msg.text);
 
-    const reply = response.text;
-
-    if (!reply) {
-      throw new Error("Gemini returned an empty response");
-    }
-
-    await bot.sendMessage(chatId, reply);
+    await bot.sendMessage(chatId, answer);
   } catch (error) {
     console.error("Gemini Error:", error);
 
     await bot.sendMessage(
       chatId,
-      "عذرًا حصل خطأ بسيط، حاول ترسل رسالتك مرة ثانية"
+      "تعذر الرد حاليا حاول مرة ثانية"
     );
   }
 });
 
-const PORT = process.env.PORT || 3000;
-
 const server = http.createServer((req, res) => {
   res.writeHead(200, {
-    "Content-Type": "text/plain"
+    "Content-Type": "text/plain; charset=utf-8"
   });
 
-  res.end("Telegram bot is running");
+  res.end("Nexus AI is running");
 });
 
-server.listen(PORT, "0.0.0.0", () => {
-  console.log("Server running on port " + PORT);
-});
+const PORT = process.env.PORT || 3000;
 
-console.log("Telegram bot is running...");
+server.listen(PORT, () => {
+  console.log(`Nexus AI running on port ${PORT}`);
+});
