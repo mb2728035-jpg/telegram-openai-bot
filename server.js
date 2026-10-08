@@ -21,25 +21,55 @@ const ai = new GoogleGenAI({
   apiKey: geminiKey
 });
 
+let modelName = null;
+
+async function getModel() {
+  try {
+    for await (const model of ai.models.list()) {
+      const name = model.name || "";
+
+      if (
+        model.supportedActions &&
+        model.supportedActions.includes("generateContent") &&
+        name.includes("gemini")
+      ) {
+        modelName = name.replace("models/", "");
+        console.log("Using Gemini model:", modelName);
+        return;
+      }
+    }
+
+    throw new Error("No Gemini model available");
+  } catch (error) {
+    console.error("Model Error:", error);
+    throw error;
+  }
+}
+
+await getModel();
+
 bot.on("message", async (msg) => {
   if (!msg.text) return;
 
   const chatId = msg.chat.id;
-  const userMessage = msg.text;
 
   try {
     await bot.sendChatAction(chatId, "typing");
 
-    const result = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: userMessage,
+    const response = await ai.models.generateContent({
+      model: modelName,
+      contents: msg.text,
       config: {
         systemInstruction:
           "أنت مساعد ذكي لخدمة الطلاب. أجب باختصار ووضوح وبأسلوب سعودي ودود. لا تطيل في الرد."
       }
     });
 
-    const reply = result.text;
+    const reply = response.text;
+
+    if (!reply) {
+      throw new Error("Empty Gemini response");
+    }
 
     await bot.sendMessage(chatId, reply);
   } catch (error) {
@@ -62,7 +92,7 @@ http
     res.end("Telegram bot is running");
   })
   .listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on port ${PORT}`);
+    console.log("Server running on port " + PORT);
   });
 
 console.log("Telegram bot is running...");
