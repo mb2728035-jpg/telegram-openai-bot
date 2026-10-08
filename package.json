@@ -1,14 +1,13 @@
 {
-  "name": "telegram-gemini-bot",
+  "name": "nexus-ai",
   "version": "1.0.0",
-  "description": "Telegram bot with Gemini AI",
   "type": "module",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "@google/genai": "^1.0.0",
+    "@google/genai": "^1.29.0",
     "node-telegram-bot-api": "^0.66.0"
   }
 }
